@@ -45,24 +45,30 @@ def checkPoint(pnt,rect):
 		flag = True
 	return flag
 
-def drawTriangles(image,triangles,rect,fill=1):
+def drawTriangles(image,triangles,rect,landmark_pts,fill=1):
+	'''
+	:param image:
+	:param triangles: Intial triangle points from descriptors
+	:param rect:
+	:param landmark_pts: Feature descirptor points of face 1
+	:return:
+	'''
 	modified_triangles = []
+	descriptor_index = []
 	for t in triangles:
 		pt1 = (t[0],t[1])
 		pt2 = (t[2],t[3])
 		pt3 = (t[4],t[5])
-		if checkPoint(pt1,rect) and checkPoint(pt2,rect) and checkPoint(pt3,rect):
-			cv2.line(image,pt1,pt2,(255,255,255),1)
-			cv2.line(image,pt2,pt3,(255,255,255),1)
-			cv2.line(image,pt3,pt1,(255,255,255),1)
-			modified_triangles.append([pt1,pt2,pt3])
-		else:
-			cv2.line(image, pt1, pt2, (255, 0, 0), 1)
-			cv2.line(image, pt2, pt3, (255, 0, 0), 1)
-			cv2.line(image, pt3, pt1, (255, 0, 0), 1)
-			modified_triangles.append([pt1, pt2, pt3])
+		cv2.line(image, pt1, pt2, (255, 255, 255), 1)
+		cv2.line(image, pt2, pt3, (255, 255, 255), 1)
+		cv2.line(image, pt3, pt1, (255, 255, 255), 1)
 
-	return image,modified_triangles
+		# Compute descriptor index of all the triangle vertices
+		idx_1 = np.where((landmark_pts == pt1).all(axis=1))
+		idx_2 = np.where((landmark_pts == pt2).all(axis=1))
+		idx_3 = np.where((landmark_pts == pt3).all(axis=1))
+		descriptor_index.append([idx_1, idx_2, idx_3])
+	return image, descriptor_index
 
 def findPoints(image,triangles):
 	if len(np.shape(image))==3:
@@ -156,7 +162,7 @@ def findFeatures(image):
 		cv2.rectangle(image,pt1,pt2,(255,0,0))
 		triangles = subdiv.getTriangleList()
 		print('No of triangles::',len(triangles))
-		image,triangles = drawTriangles(image,triangles,bound_rect)
+		image,descriptor_index = drawTriangles(image,triangles,bound_rect, shape)
 		face_triangles.append(triangles)
 		face_points.append(findPoints(gray,triangles))
 	return face_shapes,face_triangles,face_points,image
