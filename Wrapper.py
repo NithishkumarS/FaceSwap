@@ -10,7 +10,7 @@ References:
 import argparse
 import numpy as np
 import sys
-sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+# sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
 import cv2
 import os
 import copy
@@ -45,7 +45,7 @@ def checkPoint(pnt,rect):
 		flag = True
 	return flag
 
-def drawTriangles(image,triangles,rect):
+def drawTriangles(image,triangles,rect,fill=1):
 	modified_triangles = []
 	for t in triangles:
 		pt1 = (t[0],t[1])
@@ -64,6 +64,16 @@ def drawTriangles(image,triangles,rect):
 
 	return image,modified_triangles
 
+def findPoints(image,triangles):
+	if len(np.shape(image))==3:
+		image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+	image = image + 1
+	print(len(triangles))
+	for t in np.array(triangles,dtype=np.int):
+		cv2.fillPoly(image,np.array([t]),0)
+	points = np.transpose(np.where(image==0))
+	return points
+
 def calcU(point1,point2):
 	x1 = point1[0]
 	y1 = point1[1]
@@ -73,10 +83,10 @@ def calcU(point1,point2):
 	U = r_2 * np.log(r_2)
 	return U
 
-def calcK(points1,points2):
+def calcK(points):
 	K = np.zeros((len(points1,len(points2))),dtype=np.float32)
-	for i,pointi in enumerate(points1):
-		for j,poinj in enumerate(points2):
+	for i,pointsi in enumerate(points):
+		for j,pointsj in enumerate(points):
 			K[i,j] = calcU(pointi,pointj)
 	return K
 
@@ -86,8 +96,44 @@ def getP(pointsi):
 	Pt = np.transpose(P)
 	return P,Pt
 
+def getV(points):
+	V = np.hstack((points,0,0,0))
+	return V
+
+def getSpline(points1,points2):
+	lamda = 0.0001
+	identity = lamda * np.identity(len(points1)+3,dtype=np.float32)
+	zeros = np.zeros((3,3))
+	K = calcK(points1)
+	P, Pt = getP(points1)
+	A = np.linalg.inv(np.vstack((np.hstack((K,P)), np.hstack((Pt,zeros))))+identity)
+	Vx = getV(points2[:,0])
+	Vy = getV(points2[:,1])
+	valuesx = np.matmul(A,Vx)
+	valuesy = np.matmul(A,Vy)
+
+def calcSpline1d(point,values, points):
+	x = point[1]
+	y = point[0]
+	a1 = values[-1]
+	ay = values[-2]
+	ax = values[-3]
+	w = values[:-3]
+	U = []
+	for pnti in points:
+		U.append(calcU(pnti,point))
+	f = a1+ax*x+ay*y+np.sum(w*U)
+	return f
+
+def calcSpline(point, valuesx, valuesy, points):
+	fx = calcSpline1d(valuesx,point)
+	fy = calcspline1d(valuesy,point)
+	return fx,fy
 
 def findFeatures(image):
+	face_points = []
+	face_triangles = []
+	face_shapes = []
 	detector = dlib.get_frontal_face_detector()
 	predictor = dlib.shape_predictor('Descriptors/shape_predictor_68_face_landmarks.dat')
 
@@ -102,6 +148,7 @@ def findFeatures(image):
 		pt1,pt2 = rect2box(rect)
 		shape = predictor(gray,rect)
 		shape = shape_to_np(shape)
+		face_shapes.append(shape)
 		subdiv = cv2.Subdiv2D(bound_rect)
 		for (i,(x,y)) in enumerate(shape):
 			cv2.circle(image,(x,y),1, (0,0,255),-1)
@@ -110,13 +157,9 @@ def findFeatures(image):
 		triangles = subdiv.getTriangleList()
 		print('No of triangles::',len(triangles))
 		image,triangles = drawTriangles(image,triangles,bound_rect)
-	print(np.shape(triangles))
-	cv2.imshow('face',image)
-	cv2.imwrite('face.jpg', image)
-	# cv2.resizeWindow('face', 1600, 1200)
-
-	cv2.waitKey(0)
-	return shape,triangles
+		face_triangles.append(triangles)
+		face_points.append(findPoints(gray,triangles))
+	return face_shapes,face_triangles,face_points,image
 
 
 
@@ -124,16 +167,18 @@ def main():
 	source = cv2.imread('Data/Set1/face_1.jpg')  # 2faces.jpeg')
 	target = cv2.imread('Data/Set1/target.jpg')  # 2faces.jpeg')
 	print(target.shape)
-	# target = cv2.resize(target, (640, 480))
-	# cv2.imshow('target', target)
-	# cv2.waitKey(0)
-	shape, triangles = findFeatures(source)
+	shapes, triangles, points, anno = findFeatures(copy.deepcopy(source))
 
+
+
+	# Output
+	cv2.imshow('Annotations', anno)
+	cv2.imshow('Origonal Image', image)
+	# cv2.resizeWindow('face', 1600, 1200)
+	cv2.waitKey(0)
+	cv2.imwrite('face.jpg', anno)
 
 if __name__=='__main__':
 		main()
-
-
-# Face Warping using Thin Plate Spline
 
 
