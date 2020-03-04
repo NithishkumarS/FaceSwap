@@ -1,7 +1,7 @@
 import argparse
 import numpy as np
 import sys
-# sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
 import cv2
 import os
 import copy
@@ -136,13 +136,16 @@ def findFeatures(image):
 		findPoints(image,triangles)
 	print(np.shape(triangles))
 	cv2.imshow('face',image)
+	cv2.imwrite('face.jpg', image)
+	cv2.resizeWindow('face', 1600, 1200)
+
 	cv2.waitKey(0)
 	return shape,triangles
 
 
 
 
-image = cv2.imread('Data/2faces.jpeg')
+image = cv2.imread('Data/Set1/face_1.jpg')#2faces.jpeg')
 shape,triangles = findFeatures(image)
 
 

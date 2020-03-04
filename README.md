@@ -1,1 +1,0 @@
-Tested on dlib version 19.15
