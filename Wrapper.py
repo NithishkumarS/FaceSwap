@@ -1,3 +1,12 @@
+'''
+
+References:
+	https://pysource.com/2019/05/03/matching-the-two-faces-triangulation-face-swapping-opencv-with-python-part-3/
+	https://www.learnopencv.com/delaunay-triangulation-and-voronoi-diagram-using-opencv-c-python/
+
+
+'''
+
 import argparse
 import numpy as np
 import sys
@@ -47,6 +56,12 @@ def drawTriangles(image,triangles,rect):
 			cv2.line(image,pt2,pt3,(255,255,255),1)
 			cv2.line(image,pt3,pt1,(255,255,255),1)
 			modified_triangles.append([pt1,pt2,pt3])
+		else:
+			cv2.line(image, pt1, pt2, (255, 0, 0), 1)
+			cv2.line(image, pt2, pt3, (255, 0, 0), 1)
+			cv2.line(image, pt3, pt1, (255, 0, 0), 1)
+			modified_triangles.append([pt1, pt2, pt3])
+
 	return image,modified_triangles
 
 def calcU(point1,point2):
@@ -88,25 +103,35 @@ def findFeatures(image):
 		shape = predictor(gray,rect)
 		shape = shape_to_np(shape)
 		subdiv = cv2.Subdiv2D(bound_rect)
-		for (x,y) in shape:
+		for (i,(x,y)) in enumerate(shape):
 			cv2.circle(image,(x,y),1, (0,0,255),-1)
 			subdiv.insert((x,y))
 		cv2.rectangle(image,pt1,pt2,(255,0,0))
 		triangles = subdiv.getTriangleList()
+		print('No of triangles::',len(triangles))
 		image,triangles = drawTriangles(image,triangles,bound_rect)
 	print(np.shape(triangles))
 	cv2.imshow('face',image)
 	cv2.imwrite('face.jpg', image)
-	cv2.resizeWindow('face', 1600, 1200)
+	# cv2.resizeWindow('face', 1600, 1200)
 
 	cv2.waitKey(0)
 	return shape,triangles
 
 
 
+def main():
+	source = cv2.imread('Data/Set1/face_1.jpg')  # 2faces.jpeg')
+	target = cv2.imread('Data/Set1/target.jpg')  # 2faces.jpeg')
+	print(target.shape)
+	# target = cv2.resize(target, (640, 480))
+	# cv2.imshow('target', target)
+	# cv2.waitKey(0)
+	shape, triangles = findFeatures(source)
 
-image = cv2.imread('Data/Set1/face_1.jpg')#2faces.jpeg')
-shape,triangles = findFeatures(image)
+
+if __name__=='__main__':
+		main()
 
 
 # Face Warping using Thin Plate Spline
