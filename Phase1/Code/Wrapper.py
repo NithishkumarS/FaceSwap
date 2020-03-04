@@ -1,7 +1,7 @@
 import argparse
 import numpy as np
 import sys
-sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+# sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
 import cv2
 import os
 import copy
@@ -50,10 +50,14 @@ def drawTriangles(image,triangles,rect,fill=1):
 	return image,modified_triangles
 
 def findPoints(image,triangles):
-	for t in triangles:
-		print(type(t))
-		cv2.fillPoly(image,tuple(t),(255,0,0))
-	cv2.imshow('filled face',image)
+	if len(np.shape(image))==3:
+		image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+	image = image + 1
+	print(len(triangles))
+	for t in np.array(triangles,dtype=np.int):
+		cv2.fillPoly(image,np.array([t]),0)
+	points = np.transpose(np.where(image==0))
+	return points
 
 def calcU(point1,point2):
 	x1 = point1[0]
@@ -112,6 +116,9 @@ def calcSpline(point, valuesx, valuesy, points):
 	return fx,fy
 
 def findFeatures(image):
+	face_points = []
+	face_triangles = []
+	face_shapes = []
 	detector = dlib.get_frontal_face_detector()
 	predictor = dlib.shape_predictor('Descriptors/shape_predictor_68_face_landmarks.dat')
 
@@ -126,6 +133,7 @@ def findFeatures(image):
 		pt1,pt2 = rect2box(rect)
 		shape = predictor(gray,rect)
 		shape = shape_to_np(shape)
+		face_shapes.append(shape)
 		subdiv = cv2.Subdiv2D(bound_rect)
 		for (x,y) in shape:
 			cv2.circle(image,(x,y),1, (0,0,255),-1)
@@ -133,22 +141,25 @@ def findFeatures(image):
 		cv2.rectangle(image,pt1,pt2,(255,0,0))
 		triangles = subdiv.getTriangleList()
 		image,triangles = drawTriangles(image,triangles,bound_rect)
-		findPoints(image,triangles)
-	print(np.shape(triangles))
-	cv2.imshow('face',image)
-	cv2.imwrite('face.jpg', image)
-	cv2.resizeWindow('face', 1600, 1200)
-
-	cv2.waitKey(0)
-	return shape,triangles
+		face_triangles.append(triangles)
+		face_points.append(findPoints(gray,triangles))
+	return face_shapes,face_triangles,face_points,image
 
 
 
 
-image = cv2.imread('Data/Set1/face_1.jpg')#2faces.jpeg')
-shape,triangles = findFeatures(image)
+image = cv2.imread('Data/2faces.jpeg')#2faces.jpeg')
+swap = copy.deepcopy(image)
+shapes, triangles, points, anno = findFeatures(copy.deepcopy(image))
 
 
 # Face Warping using Thin Plate Spline
 
 
+#Output
+cv2.imshow('Annotations', anno)
+cv2.imshow('Origonal Image', image)
+cv2.imshow('Face Swap', swap)
+# cv2.resizeWindow('face', 1600, 1200)
+cv2.waitKey(0)
+cv2.imwrite('face.jpg', anno)
