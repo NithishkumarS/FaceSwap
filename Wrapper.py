@@ -36,7 +36,7 @@ def checkPoint(pnt,rect):
 		flag = True
 	return flag
 
-def drawTriangles(image,triangles,rect):
+def drawTriangles(image,triangles,rect,fill=1):
 	modified_triangles = []
 	for t in triangles:
 		pt1 = (t[0],t[1])
@@ -49,6 +49,12 @@ def drawTriangles(image,triangles,rect):
 			modified_triangles.append([pt1,pt2,pt3])
 	return image,modified_triangles
 
+def findPoints(image,triangles):
+	for t in triangles:
+		print(type(t))
+		cv2.fillPoly(image,tuple(t),(255,0,0))
+	cv2.imshow('filled face',image)
+
 def calcU(point1,point2):
 	x1 = point1[0]
 	y1 = point1[1]
@@ -58,10 +64,10 @@ def calcU(point1,point2):
 	U = r_2 * np.log(r_2)
 	return U
 
-def calcK(points1,points2):
+def calcK(points):
 	K = np.zeros((len(points1,len(points2))),dtype=np.float32)
-	for i,pointi in enumerate(points1):
-		for j,poinj in enumerate(points2):
+	for i,pointsi in enumerate(points):
+		for j,pointsj in enumerate(points):
 			K[i,j] = calcU(pointi,pointj)
 	return K
 
@@ -71,6 +77,39 @@ def getP(pointsi):
 	Pt = np.transpose(P)
 	return P,Pt
 
+def getV(points):
+	V = np.hstack((points,0,0,0))
+	return V
+
+def getSpline(points1,points2):
+	lamda = 0.0001
+	identity = lamda * np.identity(len(points1)+3,dtype=np.float32)
+	zeros = np.zeros((3,3))
+	K = calcK(points1)
+	P, Pt = getP(points1)
+	A = np.linalg.inv(np.vstack((np.hstack((K,P)), np.hstack((Pt,zeros))))+identity)
+	Vx = getV(points2[:,0])
+	Vy = getV(points2[:,1])
+	valuesx = np.matmul(A,Vx)
+	valuesy = np.matmul(A,Vy)
+
+def calcSpline1d(point,values, points):
+	x = point[1]
+	y = point[0]
+	a1 = values[-1]
+	ay = values[-2]
+	ax = values[-3]
+	w = values[:-3]
+	U = []
+	for pnti in points:
+		U.append(calcU(pnti,point))
+	f = a1+ax*x+ay*y+np.sum(w*U)
+	return f
+
+def calcSpline(point, valuesx, valuesy, points):
+	fx = calcSpline1d(valuesx,point)
+	fy = calcspline1d(valuesy,point)
+	return fx,fy
 
 def findFeatures(image):
 	detector = dlib.get_frontal_face_detector()
@@ -94,6 +133,7 @@ def findFeatures(image):
 		cv2.rectangle(image,pt1,pt2,(255,0,0))
 		triangles = subdiv.getTriangleList()
 		image,triangles = drawTriangles(image,triangles,bound_rect)
+		findPoints(image,triangles)
 	print(np.shape(triangles))
 	cv2.imshow('face',image)
 	cv2.waitKey(0)
