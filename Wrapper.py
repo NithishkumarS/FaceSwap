@@ -10,7 +10,7 @@ References:
 import argparse
 import numpy as np
 import sys
-# sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
 import cv2
 import os
 import copy
@@ -136,12 +136,10 @@ def calcSpline(point, valuesx, valuesy, points):
 	fy = calcspline1d(valuesy,point)
 	return fx,fy
 
-def findFeatures(image):
+def findFeatures(image, predictor, detector):
 	face_points = []
 	face_triangles = []
 	face_shapes = []
-	detector = dlib.get_frontal_face_detector()
-	predictor = dlib.shape_predictor('Descriptors/shape_predictor_68_face_landmarks.dat')
 
 	size = image.shape
 	bound_rect = (0,0,size[1],size[0])
@@ -159,30 +157,59 @@ def findFeatures(image):
 		for (i,(x,y)) in enumerate(shape):
 			cv2.circle(image,(x,y),1, (0,0,255),-1)
 			subdiv.insert((x,y))
+
+
+
 		cv2.rectangle(image,pt1,pt2,(255,0,0))
 		triangles = subdiv.getTriangleList()
 		print('No of triangles::',len(triangles))
 		image,descriptor_index = drawTriangles(image,triangles,bound_rect, shape)
 		face_triangles.append(triangles)
-		face_points.append(findPoints(gray,triangles))
-	return face_shapes,face_triangles,face_points,image
+		# face_points.append(findPoints(gray,triangles))
+	return face_shapes,face_triangles,face_points,image, descriptor_index
 
+def triangulation(source, target):
+
+	triangles_target = []
+	detector = dlib.get_frontal_face_detector()
+	predictor = dlib.shape_predictor('Descriptors/shape_predictor_68_face_landmarks.dat')
+	shapes, source_triangles, points, anno, descriptor_index = findFeatures(copy.deepcopy(source), predictor, detector)
+	target_descrip = detector(target)
+	print(len(target_descrip))
+	for t_d in target_descrip:
+		target_landmarks = predictor(cv2.cvtColor(target, cv2.COLOR_BGR2GRAY), t_d)
+		target_lpoints = shape_to_np(target_landmarks)
+	target_triangles = []
+	for triangle in descriptor_index:
+		pt1 = (target_lpoints[triangle[0]][0][0], target_lpoints[triangle[0]][0][1])
+		pt2 = (target_lpoints[triangle[1]][0][0], target_lpoints[triangle[1]][0][1])
+		pt3 = (target_lpoints[triangle[2]][0][0], target_lpoints[triangle[2]][0][1])
+		pts = [pt1, pt2, pt3]
+		cv2.line(target, pt1, pt2, (255, 255, 255), 1)
+		cv2.line(target, pt2, pt3, (255, 255, 255), 1)
+		cv2.line(target, pt3, pt1, (255, 255, 255), 1)
+        target_triangles.append(pts)
+
+		# Output
+	cv2.imshow('Annotations', anno)
+	cv2.imshow('Annotations', target)
+	cv2.imshow('Origonal Image', source)
+	# cv2.resizeWindow('face', 1600, 1200)
+
+	cv2.imwrite('face.jpg', anno)
+    return source_triangles, target_triangles
 
 
 def main():
 	source = cv2.imread('Data/Set1/face_1.jpg')  # 2faces.jpeg')
-	target = cv2.imread('Data/Set1/target.jpg')  # 2faces.jpeg')
+	target = cv2.imread('Data/Set1/target.jfif')  # 2faces.jpeg')
 	print(target.shape)
-	shapes, triangles, points, anno = findFeatures(copy.deepcopy(source))
-
-
-
-	# Output
-	cv2.imshow('Annotations', anno)
-	cv2.imshow('Origonal Image', image)
-	# cv2.resizeWindow('face', 1600, 1200)
+	source_triangles, target_triangles = triangulation(source, target)
 	cv2.waitKey(0)
-	cv2.imwrite('face.jpg', anno)
+
+    BC = compute_barycentric(triangle, corner)
+
+
 
 if __name__=='__main__':
 		main()
