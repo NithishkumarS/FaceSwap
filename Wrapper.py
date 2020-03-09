@@ -55,6 +55,7 @@ def drawTriangles(image,triangles,rect,landmark_pts,fill=1):
 	'''
 	modified_triangles = []
 	descriptor_index = []
+	triangles_cods = []
 	for t in triangles:
 		pt1 = (t[0],t[1])
 		pt2 = (t[2],t[3])
@@ -62,13 +63,14 @@ def drawTriangles(image,triangles,rect,landmark_pts,fill=1):
 		cv2.line(image, pt1, pt2, (255, 255, 255), 1)
 		cv2.line(image, pt2, pt3, (255, 255, 255), 1)
 		cv2.line(image, pt3, pt1, (255, 255, 255), 1)
-
+		pts = [pt1, pt2, pt3]
+		triangles_cods.append(pts)
 		# Compute descriptor index of all the triangle vertices
 		idx_1 = np.where((landmark_pts == pt1).all(axis=1))
 		idx_2 = np.where((landmark_pts == pt2).all(axis=1))
 		idx_3 = np.where((landmark_pts == pt3).all(axis=1))
 		descriptor_index.append([idx_1, idx_2, idx_3])
-	return image, descriptor_index
+	return image, descriptor_index, triangles_cods
 
 def findPoints(image,triangles):
 	if len(np.shape(image))==3:
@@ -158,12 +160,9 @@ def findFeatures(image, predictor, detector):
 			cv2.circle(image,(x,y),1, (0,0,255),-1)
 			subdiv.insert((x,y))
 
-
-
 		cv2.rectangle(image,pt1,pt2,(255,0,0))
 		triangles = subdiv.getTriangleList()
-		print('No of triangles::',len(triangles))
-		image,descriptor_index = drawTriangles(image,triangles,bound_rect, shape)
+		image,descriptor_index, triangles = drawTriangles(image,triangles,bound_rect, shape)
 		face_triangles.append(triangles)
 		# face_points.append(findPoints(gray,triangles))
 	return face_shapes,face_triangles,face_points,image, descriptor_index
@@ -175,7 +174,10 @@ def triangulation(source, target):
 	predictor = dlib.shape_predictor('Descriptors/shape_predictor_68_face_landmarks.dat')
 	shapes, source_triangles, points, anno, descriptor_index = findFeatures(copy.deepcopy(source), predictor, detector)
 	target_descrip = detector(target)
-	print(len(target_descrip))
+	import  scipy.spatial as spatial
+	print('sha[e', len(shapes), shapes)
+	dela = spatial.Delaunay(shapes[0])
+
 	for t_d in target_descrip:
 		target_landmarks = predictor(cv2.cvtColor(target, cv2.COLOR_BGR2GRAY), t_d)
 		target_lpoints = shape_to_np(target_landmarks)
@@ -188,16 +190,56 @@ def triangulation(source, target):
 		cv2.line(target, pt1, pt2, (255, 255, 255), 1)
 		cv2.line(target, pt2, pt3, (255, 255, 255), 1)
 		cv2.line(target, pt3, pt1, (255, 255, 255), 1)
-        target_triangles.append(pts)
+		target_triangles.append(pts)
 
 		# Output
 	cv2.imshow('Annotations', anno)
-	cv2.imshow('Annotations', target)
-	cv2.imshow('Origonal Image', source)
-	# cv2.resizeWindow('face', 1600, 1200)
-
+	cv2.imshow('target', target)
+	cv2.imshow('Original Image', source)
 	cv2.imwrite('face.jpg', anno)
-    return source_triangles, target_triangles
+	return source_triangles, target_triangles
+
+def compute_barycentric(triangle):
+	BC = np.zeros((3,3), dtype='float')
+	for i, side in enumerate(triangle):
+		BC[0,i-1] = side[0]
+		BC[1, i-1] = side[1]
+		BC[2, i-1] = 1
+	return BC
+
+def f(source_triangle, target_triangle, pt):
+	AC = compute_barycentric(st)
+	# import  pdb
+	# pdb.set_trace()
+	BC = compute_barycentric(tt)
+	pt = [pt[0], pt[1], 1]
+	greek = np.matmul(np.linalg.inv(BC), np.array(pt))
+	print('s', greek)
+	print('sum', np.sum(greek))
+	X = np.matmul(AC, greek)
+	return X
+
+def compute_affine(source_triangles, target_triangles):
+	'''
+	:param source_triangles: delauny triangles in source image
+	:param target_triangles: delauny triangles in target image
+	:return: affine transform matrix list
+	'''
+
+	print(len(source_triangles), len(target_triangles))
+	for i in range(len(source_triangles)):
+		source_mat = compute_barycentric(source_triangles[i])
+		target_mat = compute_barycentric(target_triangles[i])
+		mat = np.dot(source_mat ,np.linalg.inv(target_mat))
+		yield mat, np.linalg.inv(target_mat)
+
+def roi_triangles(feature_pts):
+	print('check:::',feature_pts[0])
+	minx, maxx = np.min(np.array(feature_pts, dtype=np.int32)[:,0]), np.max(np.array(feature_pts, dtype=np.int32)[:,0]+1)
+	miny, maxy = np.min(np.array(feature_pts, dtype=np.int32)[:, 1]), np.max(np.array(feature_pts, dtype=np.int32)[:, 1] + 1)
+	print(minx, maxx, miny, maxy)
+	face_points = [(i,j,1) for i in range(minx, maxx) for j in range(miny, maxy)]
+	return face_points
 
 
 def main():
@@ -205,9 +247,29 @@ def main():
 	target = cv2.imread('Data/Set1/target.jfif')  # 2faces.jpeg')
 	print(target.shape)
 	source_triangles, target_triangles = triangulation(source, target)
-	cv2.waitKey(0)
+	# cv2.waitKey(0)
+	# Compute Affine transformation matrices
+	ret = np.array(list(compute_affine( target_triangles, source_triangles[0])))
 
-    BC = compute_barycentric(triangle, corner)
+	# ret = list(compute_affine(source_triangles[0], target_triangles))[:,0]
+	transformation_matrices = ret[:,0]
+	B = np.array(ret[:,1])
+	output_img = swap_faces(source.copy(), target.copy(), transformation_matrices, B, source_triangles[0], target_triangles)
+
+	# for tt,st in zip(target_triangles, source_triangles):
+	# 	# AC = compute_barycentric(st)
+	# 	# # import  pdb
+	# 	# # pdb.set_trace()
+	# 	# BC = compute_barycentric(tt)
+	# 	# pt = [tt[0][0], tt[0][1], 1]
+	# 	# greek = np.matmul(np.linalg.inv(BC), np.array(pt))
+	# 	# print('s', greek)
+	# 	# print('sum', np.sum(greek))
+	# 	# X = np.matmul(AC, greek)
+	#
+	# 	X = f(st, tt, pt)
+    #     x = X[0] / X[2]
+	#     y = X[1] / X[2]
 
 
 
