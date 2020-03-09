@@ -241,6 +241,33 @@ def roi_triangles(feature_pts):
 	face_points = [(i,j,1) for i in range(minx, maxx) for j in range(miny, maxy)]
 	return face_points
 
+def swap_faces(source, target, transformation_matrices,B, source_triangles, target_triangles):
+	roi_pts = np.array( roi_triangles(target_triangles))
+	# print(roi_pts.shape)
+	roi_index = np.ones_like(roi_pts[:,0]) * np.inf
+
+    # Choosing points corresponding to
+	for triangle_index in range(len(source_triangles)):
+		print(roi_pts.T)
+		print(B[triangle_index])
+		greek = np.dot(B[triangle_index], roi_pts.T )
+		print(greek.shape)
+		print('sum size',len(np.sum(greek, axis = 0)))
+		# for i in np.sum(greek, axis = 0):
+		# 	print(i)
+		print(greek)
+		print('val:',np.where(np.sum(greek, axis=0)[0] <= 1.0))
+		print('no of elements', triangle_index, ' : ',len(np.where(np.sum(greek, axis=0)[0] <= 1)) )
+		roi_index[np.where(np.sum(greek, axis=0) <= 1)] = triangle_index
+		# print(np.where(roi_index != 0))
+    transformed_image = np.zeros_like(source)
+	for i in range(len(source_triangles)):
+		pts = roi_pts[roi_index == i]
+		transformed_coods = np.dot(transformation_matrices[i], pts.T )
+		(x,y) = pts
+	    transformed_image[y,x] = interpolation(source, transformed_coods)
+
+	return transformed_image
 
 def main():
 	source = cv2.imread('Data/Set1/face_1.jpg')  # 2faces.jpeg')
