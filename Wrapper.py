@@ -26,8 +26,8 @@ def shape_to_np(shape, dtype="int"):
 	# loop over the 68 facial landmarks and convert them
 	# to a 2-tuple of (x, y)-coordinates
 	for i in range(0, 68):
-		coords[i] = (shape.part(i).x, shape.part(i).y)
-	# return the list of (x, y)-coordinates
+		coords[i] = (shape.part(i).y, shape.part(i).x)
+	# return the list of (y, x)-coordinates
 	return coords
 
 def rect2box(rect):
@@ -58,23 +58,30 @@ def drawTriangles(image,triangles,rect,landmark_pts,fill=1):
 	descriptor_index = []
 	triangles_cods = []
 	for t in triangles:
-		pt1 = (t[0],t[1])
-		pt2 = (t[2],t[3])
-		pt3 = (t[4],t[5])
-		if t[0]>0 and t[0]<h and t[1]>0 and t[1]<w and t[2]>0 and t[2]<h and t[3]>0 and t[3]<w and t[4]>0 and t[4]<h and t[5]>0 and t[5]<w:
-			# print(landmark_pts)
-			# print('points',pt1,pt2,pt3)
-			cv2.line(image, pt1, pt2, (255, 255, 255), 1)
-			cv2.line(image, pt2, pt3, (255, 255, 255), 1)
-			cv2.line(image, pt3, pt1, (255, 255, 255), 1)
-			pts = [pt1, pt2, pt3]
-			triangles_cods.append(pts)
+		pt1 = (t[1],t[0])
+		pt2 = (t[3],t[2])
+		pt3 = (t[5],t[4])
+		if checkPoint(pt1,rect) and checkPoint(pt2,rect) and checkPoint(pt3,rect):
+			cv2.line(image,pt1,pt2,(255,255,255),1)
+			cv2.line(image,pt2,pt3,(255,255,255),1)
+			cv2.line(image,pt3,pt1,(255,255,255),1)
+			modified_triangles.append([pt1,pt2,pt3])
 			# Compute descriptor index of all the triangle vertices
-			idx_1 = np.where((landmark_pts == pt1).all(axis=1))[0][0]
-			idx_2 = np.where((landmark_pts == pt2).all(axis=1))[0][0]
-			idx_3 = np.where((landmark_pts == pt3).all(axis=1))[0][0]
+			idx_1 = np.where((landmark_pts == (t[0],t[1])).all(axis=1))[0][0]
+			idx_2 = np.where((landmark_pts == (t[2],t[3])).all(axis=1))[0][0]
+			idx_3 = np.where((landmark_pts == (t[4],t[5])).all(axis=1))[0][0]
 			descriptor_index.append([idx_1, idx_2, idx_3])
-	return image, descriptor_index, triangles_cods
+	return image, descriptor_index, modified_triangles
+
+def drawModifiedTriangles(image,triangles):
+	for t in triangles:
+		pt1 = (t[0][1],t[0][0])
+		pt2 = (t[1][1],t[1][0])
+		pt3 = (t[2][1],t[2][0])
+		cv2.line(image,pt1,pt2,(255,255,255),1)
+		cv2.line(image,pt2,pt3,(255,255,255),1)
+		cv2.line(image,pt3,pt1,(255,255,255),1)
+	return image
 
 def findPoints(image,triangles):
 	
@@ -165,7 +172,7 @@ def findFeatures(image, predictor, detector):
 		face_shapes.append(shape)
 		subdiv = cv2.Subdiv2D(bound_rect)
 		for (i,(x,y)) in enumerate(shape):
-			cv2.circle(image,(x,y),1, (0,0,255),-1)
+			cv2.circle(image,(y,x),1, (0,0,255),-1)
 			subdiv.insert((x,y))
 
 		cv2.rectangle(image,pt1,pt2,(255,0,0))
@@ -186,15 +193,18 @@ def triangulation(source, target):
 	
 	target_anno = copy.deepcopy(target)
 	target_triangles = []
-	print(np.shape(descriptor_index))
+	# print(np.shape(descriptor_index[0]))
 	target_shapes = target_shapes[1]
+	# print(np.shape(target_shapes))
 	for t in descriptor_index[0]:
+		# print(t[0],t[1],t[2])
 		target_triangles.append([target_shapes[t[0]],target_shapes[t[1]],target_shapes[t[2]]])
-
+	target_anno = drawModifiedTriangles(copy.deepcopy(target),target_triangles)
 		# Output
-	# cv2.imshow('Annotations', anno)
-	cv2.imshow('target', target)
-	cv2.imshow('Original Image', source)
+	# cv2.imshow('Source Annotations', source_anno)
+	# cv2.imshow('Target Annotations', target_anno)
+	# cv2.imshow('target', target)
+	# cv2.imshow('Original Image', source)
 	# cv2.waitKey(0)
 	# cv2.imwrite('face.jpg', anno)
 	return source_triangles, target_triangles
@@ -241,7 +251,7 @@ def roi_triangles(feature_pts):
 	face_points = [(i,j,1) for i in range(minx, maxx) for j in range(miny, maxy)]
 	return face_points
 
-def swap_faces(source, target, transformation_matrices,B, source_triangles, target_triangles):
+def swap_faces(source, target, source_triangles, target_triangles):
 	# roi_pts = np.array( roi_triangles(target_triangles))
 	# print(roi_pts.shape)
 	# roi_index = np.ones_like(roi_pts[:,0]) * np.inf
@@ -254,20 +264,21 @@ def swap_faces(source, target, transformation_matrices,B, source_triangles, targ
 		points_b = findPoints(target,Tb)
 		A_delta = compute_barycentric(Ta)
 		B_delta = compute_barycentric(Tb)
+		print(B_delta)
 		for p in points_b:
-			pnt = [p[0],p[1],1]
+			pnt = [p[1],p[0],1]
 			A_delta = compute_barycentric(Ta)
 			B_delta = compute_barycentric(Tb)
 			if np.linalg.det(B_delta) == 0:
 				B_delta[0,0] = B_delta[0,0]+1
 			# print(B_delta)
-			greek = np.dot(np.linalg.inv(B_delta),pnt)
+			greek = np.matmul(np.linalg.inv(B_delta),pnt)
 			print('greek',greek)
 			ya,xa,za = np.dot(A_delta,greek)
 			ya = np.int(ya/za)
 			xa = np.int(xa/za)
-			new_image[p[0],p[1]]=source[ya,xa]
-			new_image[ya,xa]=[0,0,255]
+			new_image[p[1],p[0]]=source[xa,ya]
+			new_image[xa,ya]=[0,0,255]
 			cv2.imshow('swapped',new_image)
 			cv2.waitKey(1)
 		# print(roi_pts.T)
@@ -300,13 +311,13 @@ def main():
 	source_triangles, target_triangles = triangulation(source, target)
 	# cv2.waitKey(0)
 	# Compute Affine transformation matrices
-	ret = np.array(list(compute_affine( target_triangles, source_triangles[0])))
-	print(np.shape(ret))
-	print(np.shape(source_triangles[0]))
+	# ret = np.array(list(compute_affine( target_triangles, source_triangles[0])))
+	print('t',np.shape(target_triangles))
+	print('s',np.shape(source_triangles[0]))
 	# ret = list(compute_affine(source_triangles[0], target_triangles))[:,0]
-	transformation_matrices = ret[:,0]
-	B = np.array(ret[:,1])
-	output_img = swap_faces(source.copy(), target.copy(), transformation_matrices, B, source_triangles[0], target_triangles)
+	# transformation_matrices = ret[:,0]
+	# B = np.array(ret[:,1])
+	output_img = swap_faces(source.copy(), target.copy(),source_triangles[0], target_triangles)
 
 	# for tt,st in zip(target_triangles, source_triangles):
 	# 	# AC = compute_barycentric(st)
