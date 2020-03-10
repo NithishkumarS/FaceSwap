@@ -77,14 +77,18 @@ def drawTriangles(image,triangles,rect,landmark_pts,fill=1):
 	return image, descriptor_index, triangles_cods
 
 def findPoints(image,triangles):
+	
 	if len(np.shape(image))==3:
 		image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-	image = image + 1
-	# print(len(triangles))
-	for t in np.array(triangles,dtype=np.int):
-		cv2.fillPoly(image,np.array([t]),0)
+	image[np.where(image==0)]+=1
+	if len(triangles) > 3:
+		for t in np.array(triangles,dtype=np.int):
+			cv2.fillPoly(image,np.array([t]),0)
+	else:
+		triangles = np.array(triangles,dtype=np.int)
+		cv2.fillPoly(image,np.array([triangles]),0)
 	points = np.transpose(np.where(image==0))
-	return points
+	return(points)
 
 def calcU(point1,point2):
 	x1 = point1[0]
@@ -183,7 +187,7 @@ def triangulation(source, target):
 	target_anno = copy.deepcopy(target)
 	target_triangles = []
 	print(np.shape(descriptor_index))
-	target_shapes = target_shapes[0]
+	target_shapes = target_shapes[1]
 	for t in descriptor_index[0]:
 		target_triangles.append([target_shapes[t[0]],target_shapes[t[1]],target_shapes[t[2]]])
 
@@ -198,23 +202,22 @@ def triangulation(source, target):
 def compute_barycentric(triangle):
 	BC = np.zeros((3,3), dtype='float')
 	for i, point in enumerate(triangle):
-		print(i)
 		BC[0,i] = point[0]
 		BC[1, i] = point[1]
 		BC[2, i] = 1
 	return BC
 
-def f(source_triangle, target_triangle, pt):
-	AC = compute_barycentric(st)
-	# import  pdb
-	# pdb.set_trace()
-	BC = compute_barycentric(tt)
-	pt = [pt[0], pt[1], 1]
-	greek = np.matmul(np.linalg.inv(BC), np.array(pt))
-	# print('s', greek)
-	# print('sum', np.sum(greek))
-	X = np.matmul(AC, greek)
-	return X
+# def f(source_triangle, target_triangle, pt):
+# 	AC = compute_barycentric(st)
+# 	# import  pdb
+# 	# pdb.set_trace()
+# 	BC = compute_barycentric(tt)
+# 	pt = [pt[0], pt[1], 1]
+# 	greek = np.matmul(np.linalg.inv(BC), np.array(pt))
+# 	# print('s', greek)
+# 	# print('sum', np.sum(greek))
+# 	X = np.matmul(AC, greek)
+# 	return X
 
 def compute_affine(source_triangles, target_triangles):
 	'''
@@ -244,13 +247,32 @@ def swap_faces(source, target, transformation_matrices,B, source_triangles, targ
 	# roi_index = np.ones_like(roi_pts[:,0]) * np.inf
 
     # Choosing points corresponding to
+	new_image = copy.deepcopy(target)
 	for ti in range(len(source_triangles)):
 		Ta = source_triangles[ti]
 		Tb = target_triangles[ti]
-		points_b = findPoints
+		points_b = findPoints(target,Tb)
+		A_delta = compute_barycentric(Ta)
+		B_delta = compute_barycentric(Tb)
+		for p in points_b:
+			pnt = [p[0],p[1],1]
+			A_delta = compute_barycentric(Ta)
+			B_delta = compute_barycentric(Tb)
+			if np.linalg.det(B_delta) == 0:
+				B_delta[0,0] = B_delta[0,0]+1
+			# print(B_delta)
+			greek = np.dot(np.linalg.inv(B_delta),pnt)
+			print('greek',greek)
+			ya,xa,za = np.dot(A_delta,greek)
+			ya = np.int(ya/za)
+			xa = np.int(xa/za)
+			new_image[p[0],p[1]]=source[ya,xa]
+			new_image[ya,xa]=[0,0,255]
+			cv2.imshow('swapped',new_image)
+			cv2.waitKey(1)
 		# print(roi_pts.T)
 		# print(B[triangle_index])
-		greek = np.dot(B[triangle_index], roi_pts.T )
+		# greek = np.dot(B[triangle_index], roi_pts.T )
 		# print(greek.shape)
 		# print('sum size',len(np.sum(greek, axis = 0)))
 		# for i in np.sum(greek, axis = 0):
@@ -258,16 +280,18 @@ def swap_faces(source, target, transformation_matrices,B, source_triangles, targ
 		# print(greek)
 		# print('val:',np.where(np.sum(greek, axis=0)[0] <= 1.0))
 		# print('no of elements', triangle_index, ' : ',len(np.where(np.sum(greek, axis=0)[0] <= 1)) )
-		roi_index[np.where(np.sum(greek, axis=0) <= 1)] = triangle_index
+		# roi_index[np.where(np.sum(greek, axis=0) <= 1)] = triangle_index
 		# print(np.where(roi_index != 0))
-	transformed_image = np.zeros_like(source)
-	for i in range(len(source_triangles)):
-		pts = roi_pts[roi_index == i]
-		transformed_coods = np.dot(transformation_matrices[i], pts.T )
-		(x,y) = pts
-		transformed_image[y,x] = interpolation(source, transformed_coods)
+	cv2.imshow('swapped',new_image)
+	cv2.waitKey(0)
+	# transformed_image = np.zeros_like(source)
+	# for i in range(len(source_triangles)):
+	# 	pts = roi_pts[roi_index == i]
+	# 	transformed_coods = np.dot(transformation_matrices[i], pts.T )
+	# 	(x,y) = pts
+	# 	transformed_image[y,x] = interpolation(source, transformed_coods)
 
-	return transformed_image
+	return new_image
 
 def main():
 	source = cv2.imread('Data/2faces.jpeg')  # 2faces.jpeg')
