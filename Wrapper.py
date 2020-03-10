@@ -180,7 +180,7 @@ def findFeatures(image, predictor, detector):
 		image,descriptor_index, triangles = drawTriangles(image,triangles,bound_rect, shape)
 		face_triangles.append(triangles)
 		face_descriptor_index.append(descriptor_index)
-		# face_points.append(findPoints(gray,triangles))
+		face_points.append(findPoints(gray,triangles))
 	return face_shapes,face_triangles,face_points,image, face_descriptor_index
 
 def triangulation(source, target):
@@ -217,18 +217,6 @@ def compute_barycentric(triangle):
 		BC[2, i] = 1
 	return BC
 
-# def f(source_triangle, target_triangle, pt):
-# 	AC = compute_barycentric(st)
-# 	# import  pdb
-# 	# pdb.set_trace()
-# 	BC = compute_barycentric(tt)
-# 	pt = [pt[0], pt[1], 1]
-# 	greek = np.matmul(np.linalg.inv(BC), np.array(pt))
-# 	# print('s', greek)
-# 	# print('sum', np.sum(greek))
-# 	X = np.matmul(AC, greek)
-# 	return X
-
 def compute_affine(source_triangles, target_triangles):
 	'''
 	:param source_triangles: delauny triangles in source image
@@ -243,96 +231,60 @@ def compute_affine(source_triangles, target_triangles):
 		mat = np.dot(source_mat ,np.linalg.inv(target_mat))
 		yield mat, np.linalg.inv(target_mat)
 
-def roi_triangles(feature_pts):
-	# print('check:::',feature_pts[0])
-	minx, maxx = np.min(np.array(feature_pts, dtype=np.int32)[:,0]), np.max(np.array(feature_pts, dtype=np.int32)[:,0]+1)
-	miny, maxy = np.min(np.array(feature_pts, dtype=np.int32)[:, 1]), np.max(np.array(feature_pts, dtype=np.int32)[:, 1] + 1)
-	# print(minx, maxx, miny, maxy)
-	face_points = [(i,j,1) for i in range(minx, maxx) for j in range(miny, maxy)]
-	return face_points
+# def roi_triangles(feature_pts):
+# 	# print('check:::',feature_pts[0])
+# 	minx, maxx = np.min(np.array(feature_pts, dtype=np.int32)[:,0]), np.max(np.array(feature_pts, dtype=np.int32)[:,0]+1)
+# 	miny, maxy = np.min(np.array(feature_pts, dtype=np.int32)[:, 1]), np.max(np.array(feature_pts, dtype=np.int32)[:, 1] + 1)
+# 	# print(minx, maxx, miny, maxy)
+# 	face_points = [(i,j,1) for i in range(minx, maxx) for j in range(miny, maxy)]
+# 	return face_points
+
+def checkGreek(greek):
+	alpha = greek[0]
+	beta = greek[1]
+	gamma = greek[2]
+	flag = False
+	# print(alpha+beta+gamma)
+	if 0<=alpha<=1 and 0<=beta<=1 and 0<=gamma<=1:
+		if 0<=alpha+beta+gamma<=1.1:
+			flag = True
+	return flag
+
 
 def swap_faces(source, target, source_triangles, target_triangles):
-	# roi_pts = np.array( roi_triangles(target_triangles))
-	# print(roi_pts.shape)
-	# roi_index = np.ones_like(roi_pts[:,0]) * np.inf
 
     # Choosing points corresponding to
+	points_b = findPoints(target,target_triangles)
 	new_image = copy.deepcopy(target)
 	for ti in range(len(source_triangles)):
 		Ta = source_triangles[ti]
 		Tb = target_triangles[ti]
-		points_b = findPoints(target,Tb)
 		A_delta = compute_barycentric(Ta)
 		B_delta = compute_barycentric(Tb)
-		print(B_delta)
+
 		for p in points_b:
 			pnt = [p[1],p[0],1]
 			A_delta = compute_barycentric(Ta)
 			B_delta = compute_barycentric(Tb)
 			if np.linalg.det(B_delta) == 0:
 				B_delta[0,0] = B_delta[0,0]+1
-			# print(B_delta)
 			greek = np.matmul(np.linalg.inv(B_delta),pnt)
-			print('greek',greek)
-			ya,xa,za = np.dot(A_delta,greek)
-			ya = np.int(ya/za)
-			xa = np.int(xa/za)
-			new_image[p[1],p[0]]=source[xa,ya]
-			new_image[xa,ya]=[0,0,255]
-			cv2.imshow('swapped',new_image)
-			cv2.waitKey(1)
-		# print(roi_pts.T)
-		# print(B[triangle_index])
-		# greek = np.dot(B[triangle_index], roi_pts.T )
-		# print(greek.shape)
-		# print('sum size',len(np.sum(greek, axis = 0)))
-		# for i in np.sum(greek, axis = 0):
-		# 	print(i)
-		# print(greek)
-		# print('val:',np.where(np.sum(greek, axis=0)[0] <= 1.0))
-		# print('no of elements', triangle_index, ' : ',len(np.where(np.sum(greek, axis=0)[0] <= 1)) )
-		# roi_index[np.where(np.sum(greek, axis=0) <= 1)] = triangle_index
-		# print(np.where(roi_index != 0))
-	cv2.imshow('swapped',new_image)
-	cv2.waitKey(0)
-	# transformed_image = np.zeros_like(source)
-	# for i in range(len(source_triangles)):
-	# 	pts = roi_pts[roi_index == i]
-	# 	transformed_coods = np.dot(transformation_matrices[i], pts.T )
-	# 	(x,y) = pts
-	# 	transformed_image[y,x] = interpolation(source, transformed_coods)
 
+			if checkGreek(greek):
+				ya,xa,za = np.dot(A_delta,greek)
+				ya = np.int(ya/za)
+				xa = np.int(xa/za)
+				new_image[p[1],p[0]]=source[xa,ya]
 	return new_image
 
 def main():
 	source = cv2.imread('Data/2faces.jpeg')  # 2faces.jpeg')
 	target = cv2.imread('Data/2faces.jpeg')  # 2faces.jpeg')
-	print(source.shape)
 	source_triangles, target_triangles = triangulation(source, target)
-	# cv2.waitKey(0)
-	# Compute Affine transformation matrices
-	# ret = np.array(list(compute_affine( target_triangles, source_triangles[0])))
-	print('t',np.shape(target_triangles))
-	print('s',np.shape(source_triangles[0]))
-	# ret = list(compute_affine(source_triangles[0], target_triangles))[:,0]
-	# transformation_matrices = ret[:,0]
-	# B = np.array(ret[:,1])
 	output_img = swap_faces(source.copy(), target.copy(),source_triangles[0], target_triangles)
+	cv2.imshow('Swapped',output_img)
+	cv2.waitKey(0)
 
-	# for tt,st in zip(target_triangles, source_triangles):
-	# 	# AC = compute_barycentric(st)
-	# 	# # import  pdb
-	# 	# # pdb.set_trace()
-	# 	# BC = compute_barycentric(tt)
-	# 	# pt = [tt[0][0], tt[0][1], 1]
-	# 	# greek = np.matmul(np.linalg.inv(BC), np.array(pt))
-	# 	# print('s', greek)
-	# 	# print('sum', np.sum(greek))
-	# 	# X = np.matmul(AC, greek)
-	#
-	# 	X = f(st, tt, pt)
-    #     x = X[0] / X[2]
-	#     y = X[1] / X[2]
 
 
 
