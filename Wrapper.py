@@ -244,7 +244,10 @@ def swap_faces(source, target, transformation_matrices,B, source_triangles, targ
 	# roi_index = np.ones_like(roi_pts[:,0]) * np.inf
 
     # Choosing points corresponding to
-	for triangle_index in range(len(source_triangles)):
+	for ti in range(len(source_triangles)):
+		Ta = source_triangles[ti]
+		Tb = target_triangles[ti]
+		points_b = findPoints
 		# print(roi_pts.T)
 		# print(B[triangle_index])
 		greek = np.dot(B[triangle_index], roi_pts.T )
