@@ -3,14 +3,12 @@
 References:
 	https://pysource.com/2019/05/03/matching-the-two-faces-triangulation-face-swapping-opencv-with-python-part-3/
 	https://www.learnopencv.com/delaunay-triangulation-and-voronoi-diagram-using-opencv-c-python/
-
-
 '''
 
 import argparse
 import numpy as np
 import sys
-# sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
 import cv2
 import os
 import copy
@@ -18,7 +16,6 @@ import itertools
 import random
 import dlib
 # from imutils import face_utils
-
 
 def shape_to_np(shape, dtype="int"):
 	# initialize the list of (x, y)-coordinates
@@ -74,7 +71,8 @@ def drawTriangles(image,triangles,rect,landmark_pts,fill=1):
 	return image, descriptor_index, modified_triangles
 
 def drawModifiedTriangles(image,triangles):
-	for t in triangles:
+	# print(len(triangles), len(triangles[0]))
+	for t in triangles:	#check with zack
 		pt1 = (t[0][1],t[0][0])
 		pt2 = (t[1][1],t[1][0])
 		pt3 = (t[2][1],t[2][0])
@@ -88,11 +86,15 @@ def findPoints(image,triangles,mask = False):
 	if len(np.shape(image))==3:
 		image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 	image[:,:]=0
+	print(len(triangles), len(triangles[0]))
+
 	if len(triangles) > 3:
 		for t in np.array(triangles,dtype=np.int):
 			cv2.fillPoly(image,np.array([t]),255)
 	else:
 		triangles = np.array(triangles,dtype=np.int)
+		print(triangles.shape)
+		# print(triangles)
 		cv2.fillPoly(image,np.array([triangles]),255)
 	points = np.transpose(np.where(image==255))
 	if mask:
@@ -214,14 +216,14 @@ def triangulation(source, target, mode):
 		descriptor_index = descriptor_index[0]
 		target_shapes = target_shapes[1]
 		target_points = target_points[1]
-
-	for t in descriptor_index:
+	for t in descriptor_index[0]:
 		# print(t[0],t[1],t[2])
 		target_triangles.append([target_shapes[t[0]],target_shapes[t[1]],target_shapes[t[2]]])
+	print('target triangles', len(target_triangles))
 	target_anno = drawModifiedTriangles(copy.deepcopy(target),target_triangles)
 		# Output
-	cv2.imshow('Source Annotations', source_anno)
-	cv2.imshow('Target Annotations', target_anno)
+	# cv2.imshow('Source Annotations', source_anno)
+	# cv2.imshow('Target Annotations', target_anno)
 	# cv2.imshow('target', target)
 	# cv2.imshow('Original Image', source)
 	# cv2.waitKey(0)
@@ -270,7 +272,30 @@ def checkGreek(greek):
 			flag = True
 	return flag
 
+def interpolate(source, pts):
+		'''
+		:param source: Source image to be interpolated
+		:param pts: Target image applied with inverse Affine transform
+		:return: images values of one corresponding triangle
+		'''
+		rounded_pts = np.int32(pts)
+		# print(np.array(pts).shape, rounded_pts.shape)
+		dx, dy = pts - rounded_pts
+		# print(pts[0], rounded_pts[0], dx)
+		# print(pts[1], rounded_pts[1], dy)
+		# print('diff', dx, dy)
 
+		val00 = source[rounded_pts[1], rounded_pts[0]]
+		val01 = source[rounded_pts[1], rounded_pts[0] + 1]
+		val11 = source[rounded_pts[1] + 1, rounded_pts[0]]
+		val10 = source[rounded_pts[1] + 1, rounded_pts[0] + 1]
+
+		axis1 = val01.T * dx + val00.T * (1 - dx)
+		axis2 = val10.T * dx + val11.T * (1 - dx)
+		interp = axis1 *(1- dy) + axis2 * dy			#(1 - dy)
+		# print(len(interp))
+		# print()
+		return interp
 def swap_faces(source, target, source_triangles, target_triangles,flag=False):
 
     # Choosing points corresponding to
@@ -284,6 +309,7 @@ def swap_faces(source, target, source_triangles, target_triangles,flag=False):
 		A_delta = compute_barycentric(Ta)
 		B_delta = compute_barycentric(Tb)
 		if flag:
+			ss
 			for p in points_b:
 				pnt = [p[1],p[0],1]
 				A_delta = compute_barycentric(Ta)
@@ -303,6 +329,8 @@ def swap_faces(source, target, source_triangles, target_triangles,flag=False):
 					# cv2.imshow('Progress',new_image)
 					# cv2.waitKey(1)
 		else:
+			import pdb
+			# pdb.set_trace()
 			for p in points_b:
 				pnt = [p[1],p[0],1]
 				A_delta = compute_barycentric(Ta)
@@ -313,9 +341,10 @@ def swap_faces(source, target, source_triangles, target_triangles,flag=False):
 
 				if checkGreek(greek):
 					ya,xa,za = np.dot(A_delta,greek)
-					ya = np.int(ya/za)
-					xa = np.int(xa/za)
-					new_image[p[1],p[0]]=source[xa,ya]
+					ya = ya/za		#np.int(ya/za)
+					xa = xa/za	#np.int(xa/za)
+					new_image[p[1],p[0]]=interpolate(source, [ya,xa])
+					# source[xa,ya]
 					mask[p[1],p[0]] = [255,255,255]
 	M = cv2.moments(mask[:,:,0])
 	cX = int(M["m10"]/M["m00"])
@@ -328,25 +357,29 @@ def swap_faces(source, target, source_triangles, target_triangles,flag=False):
 def main():
 	Parser = argparse.ArgumentParser()
 	# Parser.add_argument('--NumFeatures', default=100, help='Number of best features to extract from each image, Default:100')
-	Parser.add_argument('--sourceImage', default='Data/2faces.jpeg', help='Directory that contains images for panorama sticking')
-	Parser.add_argument('--targetImage', default='Data/2faces.jpeg', help='Directory that contains images for panorama sticking')
-	Parser.add_argument('--mode', default=2, help='mode = 1:swap a face from a source image into a target image 2:swap face between two people in the same image')
+	Parser.add_argument('--sourceImage', default='Data/Set1/face_100.jpg', help='Directory that contains images for panorama sticking')
+	Parser.add_argument('--targetImage', default='Data/Set1/target.jfif', help='Directory that contains images for panorama sticking')
+	Parser.add_argument('--mode', default='2', help='mode = 1:swap a face from a source image into a target image 2:swap face between two people in the same image')
 
 	Args = Parser.parse_args()
 	source_name = Args.sourceImage
 	target_name = Args.targetImage
-	mode = Args.mode
+	mode = int(Args.mode)
 
+    # for i in range(100):
 	if mode == 2:
 		target_name = source_name
 		source = cv2.imread(source_name)
 		target = cv2.imread(target_name)
 		cv2.imshow('Original Image',source)
 	if mode ==1:
-		source = cv2.imread(source_name)
+		print('here', source_name)
+
+		source = cv2.imread('Data/Set1/face_1.jpg')
 		target = cv2.imread(target_name)
-		cv2.imshow('Target Image',target)
-		cv2.imshow('Source Image',source)
+		# cv2.imshow('Target Image',target)
+		# cv2.imshow('Source Image',source)
+
 	# else:
 	# 	print('This is not a valid mode')
 	# 	return False
@@ -354,8 +387,8 @@ def main():
 	source_triangles, target_triangles = triangulation(source, target, mode)
 	# print('s',np.shape(source_triangles))
 	# print('t',np.shape(target_triangles))
- 
-	output_img,new_image = swap_faces(source, target,source_triangles, target_triangles)
+
+	output_img,new_image = swap_faces(source, target,source_triangles[0], target_triangles)
 	if mode == 2:
 		output_img,new_image = swap_faces(source, new_image, target_triangles, source_triangles,flag = True)
 	cv2.imshow('Swapped',output_img)
