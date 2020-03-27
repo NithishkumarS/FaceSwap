@@ -220,8 +220,10 @@ def triangulation(source, target, mode):
 		descriptor_index = descriptor_index[0]
 		target_shapes = target_shapes[1]
 		target_points = target_points[1]
-	for t in descriptor_index[0]:
-		# print(t[0],t[1],t[2])
+
+	for t in descriptor_index[0]:	#descriptor_index[0]
+		print(t[0],t[1],t[2])
+		ss
 		target_triangles.append([target_shapes[t[0]],target_shapes[t[1]],target_shapes[t[2]]])
 	# target_anno = drawModifiedTriangles(copy.deepcopy(target),target_triangles)
 	target_anno,target_triangles = drawModifiedTriangles(copy.deepcopy(target),target_triangles)
@@ -369,6 +371,8 @@ def main():
 	Parser.add_argument('--targetImage', default='Data/Set1/target.jfif', help='Directory that contains images for panorama sticking')
 	Parser.add_argument('--mode', default='2', help='mode = 1:swap a face from a source image into a target image 2:swap face between two people in the same image')
 
+	# 'Data/TestSet_P2/Test1.mp4'
+
 	Args = Parser.parse_args()
 	source_name = Args.sourceImage
 	target_name = Args.targetImage
@@ -383,34 +387,37 @@ def main():
 	if mode ==1:
 		print('here', source_name)
 
-		source = cv2.imread('Data/Set1/face_1.jpg')
+		# source = cv2.imread('Data/Set1/face_1.jpg')
 		target = cv2.imread(target_name)
 		# cv2.imshow('Target Image',target)
 		# cv2.imshow('Source Image',source)
 		cv2.waitKey(0)
 
+	cap = cv2.VideoCapture(source_name)
+	while(cap.isOpened()):
+		ret, source= cap.read()
+		cv2.imshow('source', source)
+		cv2.waitKey(0)
 	# else:
 	# 	print('This is not a valid mode')
 	# 	return False
 	# cv2.waitKey(0)
-	print(type(source), type(target), type(mode))
-	source_triangles, target_triangles = triangulation(source, target, mode)
-	# print('s',np.shape(source_triangles))
-	# print('t',np.shape(target_triangles))
-	output_img,new_img = swap_faces(source, target,source_triangles[0], target_triangles)
+		print(type(source), type(target), type(mode))
+		source_triangles, target_triangles = triangulation(source, target, mode)
+		# print('s',np.shape(source_triangles))
+		# print('t',np.shape(target_triangles))
+		output_img,new_img = swap_faces(source, target,source_triangles[0], target_triangles)
 
-	# output_img,new_img = swap_faces(source, target,source_triangles, target_triangles)
-	if mode == 2:
-		# pass
-		output_img,new_img = swap_faces(source, output_img, target_triangles, source_triangles,flag = True)
-	cv2.imshow('Swapped',output_img)
-	cv2.imshow("N0 Blending", new_img)
-	print('Done')
-	cv2.waitKey(0)
-
-
-
-
+		# output_img,new_img = swap_faces(source, target,source_triangles, target_triangles)
+		if mode == 2:
+			# pass
+			output_img,new_img = swap_faces(source, output_img, target_triangles, source_triangles,flag = True)
+		cv2.imshow('Swapped',output_img)
+		cv2.imshow("N0 Blending", new_img)
+		print('Done')
+		cv2.waitKey(0)
+	cap.release()
+	cv2.destroyAllWindows()
 
 if __name__=='__main__':
 		main()
