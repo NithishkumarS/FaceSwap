@@ -347,9 +347,9 @@ def swap_faces(source, target, source_triangles, target_triangles,flag=False):
 					ya,xa,za = np.dot(A_delta,greek)
 					ya = ya/za		#np.int(ya/za)
 					xa = xa/za	#np.int(xa/za)
-					new_image[p[1],p[0]]=interpolate(source, [ya,xa])
+					new_image[p[0],p[1]]=interpolate(source, [ya,xa])
 					# source[xa,ya]
-					mask[p[1],p[0]] = [255,255,255]
+					mask[p[0],p[1]] = [255,255,255]
 
 	cv2.imshow('mask',mask)
 	# cv2.waitKey(0)
@@ -387,21 +387,23 @@ def main():
 		target = cv2.imread(target_name)
 		# cv2.imshow('Target Image',target)
 		# cv2.imshow('Source Image',source)
+		cv2.waitKey(0)
 
 	# else:
 	# 	print('This is not a valid mode')
 	# 	return False
 	# cv2.waitKey(0)
+	print(type(source), type(target), type(mode))
 	source_triangles, target_triangles = triangulation(source, target, mode)
 	# print('s',np.shape(source_triangles))
 	# print('t',np.shape(target_triangles))
-	output_img,new_image = swap_faces(source, target,source_triangles[0], target_triangles)
+	output_img,new_img = swap_faces(source, target,source_triangles[0], target_triangles)
 
 	# output_img,new_img = swap_faces(source, target,source_triangles, target_triangles)
 	if mode == 2:
 		# pass
 		output_img,new_img = swap_faces(source, output_img, target_triangles, source_triangles,flag = True)
-	# cv2.imshow('Swapped',output_img)
+	cv2.imshow('Swapped',output_img)
 	cv2.imshow("N0 Blending", new_img)
 	print('Done')
 	cv2.waitKey(0)
