@@ -328,8 +328,8 @@ def swap_faces(source, target, source_triangles, target_triangles,flag=False):
 def main():
 	Parser = argparse.ArgumentParser()
 	# Parser.add_argument('--NumFeatures', default=100, help='Number of best features to extract from each image, Default:100')
-	Parser.add_argument('--sourceImage', default='Data/2faces.jpeg', help='Directory that contains images for panorama sticking')
-	Parser.add_argument('--targetImage', default='Data/2faces.jpeg', help='Directory that contains images for panorama sticking')
+	Parser.add_argument('--sourceImage', default='Data/2faces.jpg', help='Directory that contains images for panorama sticking')
+	Parser.add_argument('--targetImage', default='Data/2faces.jpg', help='Directory that contains images for panorama sticking')
 	Parser.add_argument('--mode', default=2, help='mode = 1:swap a face from a source image into a target image 2:swap face between two people in the same image')
 
 	Args = Parser.parse_args()
@@ -355,11 +355,11 @@ def main():
 	# print('s',np.shape(source_triangles))
 	# print('t',np.shape(target_triangles))
  
-	output_img,new_image = swap_faces(source, target,source_triangles, target_triangles)
+	output_img,new_img = swap_faces(source, target,source_triangles, target_triangles)
 	if mode == 2:
-		output_img,new_image = swap_faces(source, new_image, target_triangles, source_triangles,flag = True)
+		output_img,new_img = swap_faces(source, output_img, target_triangles, source_triangles,flag = True)
 	cv2.imshow('Swapped',output_img)
-	cv2.imshow("N0 Blending", new_image)
+	cv2.imshow("N0 Blending", new_img)
 	cv2.waitKey(0)
 
 
