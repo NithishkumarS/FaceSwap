@@ -87,14 +87,11 @@ def findPoints(image,triangles,mask = False):
 	if len(np.shape(image))==3:
 		image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 	image[:,:]=0
-	print(len(triangles), len(triangles[0]))
-
 	if len(triangles) > 3:
 		for t in np.array(triangles,dtype=np.int):
 			cv2.fillPoly(image,np.array([t]),255)
 	else:
 		triangles = np.array(triangles,dtype=np.int)
-		print(triangles.shape)
 		# print(triangles)
 		cv2.fillPoly(image,np.array([triangles]),255)
 	points = np.transpose(np.where(image==255))
@@ -173,6 +170,7 @@ def findFeatures(image, predictor, detector):
 	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
 	rects = detector(gray,1)
+
 	for (i, rect) in enumerate(rects):
 		pt1,pt2 = rect2box(rect)
 		cv2.rectangle(image,pt1,pt2,(255,0,0))
@@ -199,7 +197,9 @@ def triangulation(source, target, mode):
 	predictor = dlib.shape_predictor('Descriptors/shape_predictor_68_face_landmarks.dat')
 	source_shapes, source_triangles, source_points, source_anno, descriptor_index = findFeatures(copy.deepcopy(source), predictor, detector)
 	target_shapes, _, target_points, _, _ = findFeatures(copy.deepcopy(target), predictor, detector)
-	
+	print('st ',len(source_triangles), source_triangles)
+	print('tt ', len(target_points))
+	ssks
 	target_anno = copy.deepcopy(target)
 	target_triangles = []
 
@@ -221,26 +221,23 @@ def triangulation(source, target, mode):
 		target_shapes = target_shapes[1]
 		target_points = target_points[1]
 
-	for t in descriptor_index[0]:	#descriptor_index[0]
-		print(t[0],t[1],t[2])
-		ss
+	for t in descriptor_index:
 		target_triangles.append([target_shapes[t[0]],target_shapes[t[1]],target_shapes[t[2]]])
 	# target_anno = drawModifiedTriangles(copy.deepcopy(target),target_triangles)
 	target_anno,target_triangles = drawModifiedTriangles(copy.deepcopy(target),target_triangles)
 
 		# Output
-	# cv2.imshow('Source Annotations', source_anno)
-	# cv2.imshow('Target Annotations', target_anno)
+	cv2.imshow('Source Annotations', source_anno)
+	cv2.imshow('Target Annotations', target_anno)
 	# cv2.imshow('target', target)
 	# cv2.imshow('Original Image', source)
-	# cv2.waitKey(0)
+	cv2.waitKey(0)
 	# cv2.imwrite('face.jpg', anno)
 	return source_triangles, target_triangles
 
 def compute_barycentric(triangle):
 	BC = np.zeros((3,3), dtype='float')
 	for i, point in enumerate(triangle):
-		# print(point)
 		BC[0,i] = point[0]
 		BC[1, i] = point[1]
 		BC[2, i] = 1
@@ -307,17 +304,14 @@ def swap_faces(source, target, source_triangles, target_triangles,flag=False):
 
     # Choosing points corresponding to
 	points_b = findPoints(target,target_triangles,mask=True)
-	print(len(points_b))
 	new_image = copy.deepcopy(target)
 	mask = np.zeros(target.shape,dtype=np.uint8)
-
 	for ti in range(len(source_triangles)):
 		Ta = source_triangles[ti]
 		Tb = target_triangles[ti]
 		A_delta = compute_barycentric(Ta)
 		B_delta = compute_barycentric(Tb)
 		if flag:
-			ss
 			for p in points_b:
 				pnt = [p[1],p[0],1]
 				mask[p[0],p[1]] = [255,255,255]
@@ -367,8 +361,8 @@ def main():
 	Parser = argparse.ArgumentParser()
 	# Parser.add_argument('--NumFeatures', default=100, help='Number of best features to extract from each image, Default:100')
 
-	Parser.add_argument('--sourceImage', default='Data/Set1/face_100.jpg', help='Directory that contains images for panorama sticking')
-	Parser.add_argument('--targetImage', default='Data/Set1/target.jfif', help='Directory that contains images for panorama sticking')
+	Parser.add_argument('--sourceImage', default='Data/2faces.jpg', help='Directory that contains images for panorama sticking')
+	Parser.add_argument('--targetImage', default='Data/2faces.jpg', help='Directory that contains images for panorama sticking')
 	Parser.add_argument('--mode', default='2', help='mode = 1:swap a face from a source image into a target image 2:swap face between two people in the same image')
 
 	# 'Data/TestSet_P2/Test1.mp4'
@@ -396,13 +390,13 @@ def main():
 	cap = cv2.VideoCapture(source_name)
 	while(cap.isOpened()):
 		ret, source= cap.read()
-		cv2.imshow('source', source)
-		cv2.waitKey(0)
+		print(source.shape)
+		# cv2.imshow('source', source)
+		# cv2.waitKey(0)
 	# else:
 	# 	print('This is not a valid mode')
 	# 	return False
 	# cv2.waitKey(0)
-		print(type(source), type(target), type(mode))
 		source_triangles, target_triangles = triangulation(source, target, mode)
 		# print('s',np.shape(source_triangles))
 		# print('t',np.shape(target_triangles))
@@ -418,6 +412,7 @@ def main():
 		cv2.waitKey(0)
 	cap.release()
 	cv2.destroyAllWindows()
+
 
 if __name__=='__main__':
 		main()
