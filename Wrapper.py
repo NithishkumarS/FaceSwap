@@ -8,7 +8,7 @@ References:
 import argparse
 import numpy as np
 import sys
-sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+# sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
 import cv2
 import os
 import copy
@@ -169,12 +169,12 @@ def findFeatures(image, predictor, detector):
 	bound_rect = (0,0,size[0],size[1])
 	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-	rects = detector(gray,1)
+	rects = detector(image,1)
 
-	for (i, rect) in enumerate(rects):
-		pt1,pt2 = rect2box(rect)
+	for (i, d) in enumerate(rects):
+		pt1,pt2 = rect2box(d.rect)
 		cv2.rectangle(image,pt1,pt2,(255,0,0))
-		shape = predictor(gray,rect)
+		shape = predictor(gray,d.rect)
 		shape = shape_to_np(shape)
 		face_shapes.append(shape)
 		subdiv = cv2.Subdiv2D(bound_rect)
@@ -193,7 +193,8 @@ def findFeatures(image, predictor, detector):
 def triangulation(source, target, mode):
 
 	triangles_target = []
-	detector = dlib.get_frontal_face_detector()
+	detector_path = os.path.join('.', 'Descriptors/net-data/mmod_human_face_detector.dat')
+	detector = dlib.cnn_face_detection_model_v1(detector_path)
 	predictor = dlib.shape_predictor('Descriptors/shape_predictor_68_face_landmarks.dat')
 	source_shapes, source_triangles, source_points, source_anno, descriptor_index = findFeatures(copy.deepcopy(source), predictor, detector)
 	target_shapes, _, target_points, _, _ = findFeatures(copy.deepcopy(target), predictor, detector)
@@ -219,17 +220,19 @@ def triangulation(source, target, mode):
 		target_shapes = target_shapes[1]
 		target_points = target_points[1]
 
-	for t in descriptor_index[0]:
+	for t in descriptor_index:
 		target_triangles.append([target_shapes[t[0]],target_shapes[t[1]],target_shapes[t[2]]])
 	# target_anno = drawModifiedTriangles(copy.deepcopy(target),target_triangles)
 
 	target_anno,target_triangles = drawModifiedTriangles(copy.deepcopy(target),target_triangles)
 
 	# Output
-	# cv2.imshow('Source Annotations', source_anno)
-	# cv2.imshow('Target Annotations', target_anno)
-
+	cv2.imshow('Source Annotations', source_anno)
+	cv2.imshow('Target Annotations', target_anno)
+	cv2.waitKey(0)
 	# cv2.imwrite('face.jpg', anno)
+	print(len(source_triangles))
+	print(len(target_triangles))
 	return source_triangles, target_triangles
 
 def compute_barycentric(triangle):
@@ -304,6 +307,7 @@ def swap_faces(source, target, source_triangles, target_triangles,flag=False):
 	points_b = findPoints(target,target_triangles,mask=True)
 	new_image = copy.deepcopy(target)
 	mask = np.zeros(target.shape,dtype=np.uint8)
+	print(len(source_triangles))
 	for ti in range(len(source_triangles)):
 		Ta = source_triangles[ti]
 		Tb = target_triangles[ti]
@@ -363,56 +367,82 @@ def main():
 	Parser.add_argument('--sourceImage', default='Data/2faces.jpg', help='Directory that contains images for panorama sticking')
 	Parser.add_argument('--targetImage', default='Data/2faces.jpg', help='Directory that contains images for panorama sticking')
 	Parser.add_argument('--mode', default='2', help='mode = 1:swap a face from a source image into a target image 2:swap face between two people in the same image')
-
+	Parser.add_argument('--outputName', default='output.mp4', help='Path and name of the output file')
 	# 'Data/TestSet_P2/Test1.mp4'
 
 	Args = Parser.parse_args()
 	source_name = Args.sourceImage
 	target_name = Args.targetImage
 	mode = int(Args.mode)
-
-    # for i in range(100):
+	outputName = Args.outputName
+	fourcc = cv2.VideoWriter_fourcc(*'MP4V')
+	out = cv2.VideoWriter(outputName,fourcc,30.0,(640,480))
+	# for i in range(100):
 	if mode == 2:
 		target_name = source_name
-		source = cv2.imread(source_name)
-		target = cv2.imread(target_name)
-		cv2.imshow('Original Image',source)
+		# source = cv2.imread(source_name)
+		# target = cv2.imread(target_name)
+		# cv2.imshow('Original Image',source)
 	if mode ==1:
 		source = cv2.imread(source_name)
 		#  target = cv2.imread(target_name)
 		# cv2.imshow('Target Image',target)
 		# cv2.imshow('Source Image',source)
-		cv2.waitKey(1)
+		# cv2.waitKey(1)
 	count = 0
 	cap = cv2.VideoCapture(target_name)
 	while(cap.isOpened()):
 		ret, target= cap.read()
+		if ret == True:
+			pass
+		else:
+			break
+		if mode == 2:
+			source = target
 		count += 1
-		# print('count: ', count)
-		if count < 30:
-			continue
+		print('count: ', count)
+		# if count < 30:
+		# 	continue
 		# print(source.shape)
-		# cv2.imshow('source', source)
+		# cv2.imshow('target', target)
 		# cv2.waitKey(0)
 		try:
 
 			source_triangles, target_triangles = triangulation(source, target, mode)
-			# print('s',np.shape(source_triangles))
-			# print('t',np.shape(target_triangles))
+			# # print('s',np.shape(source_triangles))
+			# # print('t',np.shape(target_triangles))
 			print('swapping faces')
-			output_img,new_img = swap_faces(source, target,source_triangles[0], target_triangles)
+			output_img,new_img = swap_faces(source, target,source_triangles, target_triangles)
 			print('done')
 			# output_img,new_img = swap_faces(source, target,source_triangles, target_triangles)
 			if mode == 2:
 				# pass
 				output_img,new_img = swap_faces(source, output_img, target_triangles, source_triangles,flag = True)
 			cv2.imshow('Swapped',output_img)
-			cv2.imshow("N0 Blending", new_img)
-			print('Done')
+			# cv2.imshow("N0 Blending", new_img)
+			# print('Done')
 			cv2.waitKey(1)
+			out.write(output_img)
 		except:
 			continue
+			# source_triangles, target_triangles = triangulation(source, target, mode)
+			# # # print('s',np.shape(source_triangles))
+			# # # print('t',np.shape(target_triangles))
+			# print('swapping faces')
+			# output_img,new_img = swap_faces(source, target,source_triangles, target_triangles)
+			# print('done')
+			# # output_img,new_img = swap_faces(source, target,source_triangles, target_triangles)
+			# if mode == 2:
+			# 	# pass
+			# 	output_img,new_img = swap_faces(source, output_img, target_triangles, source_triangles,flag = True)
+			# cv2.imshow('Swapped',output_img)
+			# # cv2.imshow("N0 Blending", new_img)
+			# # print('Done')
+			# cv2.waitKey(1)
+			# out.write(output_img)
 	cap.release()
+	out.release()
+	
 	cv2.destroyAllWindows()
 
 
