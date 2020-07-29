@@ -14,14 +14,13 @@ Steps include:
 "Triangular mesh from the fiducial landmarks via delaunay triangulation" <br/>
 
 ![set1](images/set1.jpg)
-Source and target faces
-![Output](images/Swapped_54.jpg)
+Source and target faces <br/>
+![Output](images/Swapped_54.jpg) <br/>
 Swapped face.
 
 Sample outputs and the source images:
 ![Source 1](images/set2.jpg)
 
-![Source 2](images/set3.jpg)
 
 Required Packages 
 ```
