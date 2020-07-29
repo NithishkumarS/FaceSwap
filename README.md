@@ -10,22 +10,22 @@ Steps include:
 4) Replace face
 5) Poisson Blending
 
-![Mesh](images/triangularMesh.jpg)
-Triangular mesh from the fiducial landmarks via delaunay triangulation.
+![Mesh](images/triangularMesh.jpg) <br/>
+Triangular mesh from the fiducial landmarks via delaunay triangulation.<br/>
 
-![](images/source1.jpg =250x)
-![](images/face_54.jpg =250x)
+![Source 1](images/source1.jpg =150x)
+![Target 1](images/face_54.jpg =150x)
 Source and target faces
-![](images/Swapped_54.jpg =250x)
+![Output](images/Swapped_54.jpg =150x)
 Swapped face.
 
 Sample outputs and the source images:
-![](images/source1.jpg =250x)
-![](images/output1.jpg =250x)
+![Source 1](images/source1.jpg =150x)
+![Output 1](images/output1.jpg =150x)
 
 
-![](images/source2.jpg =250x)
-![](images/output2.jpg =250x)
+![Source 2](images/source2.jpg =150x)
+![Output 2](images/output2.jpg =150x)
 
 Required Packages 
 ```
