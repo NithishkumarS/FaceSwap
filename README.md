@@ -13,7 +13,7 @@ Steps include:
 ![Mesh](images/triangularMesh.jpg ) <br/>
 "Triangular mesh from the fiducial landmarks via delaunay triangulation" <br/>
 
-![Source 1](images/source1.jpg){:height=100 width=150}
+![Source 1](images/source1.jpg {:height=100 width=150})
 ![Target 1](images/face_54.jpg =150x)
 Source and target faces
 ![Output](images/Swapped_54.jpg =150x)
