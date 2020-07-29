@@ -15,14 +15,13 @@ Steps include:
 
 !set1](images/set1.jpg)
 Source and target faces
-![Output](images/Swapped_54.jpg)
+![Output](images/set1.jpg)
 Swapped face.
 
 Sample outputs and the source images:
-![Source 1](images/set1.jpg)
+![Source 1](images/set2.jpg)
 
-
-![Source 2](images/set2.jpg)
+![Source 2](images/set3.jpg)
 
 Required Packages 
 ```
